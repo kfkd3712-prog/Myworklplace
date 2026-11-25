@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- My Workspace v1.4 · 2026-11-18 · 주간 보고, 프로젝트 템플릿, 빠른 입력, 캘린더 드래그, 마감 알림, 체크리스트, 공부 기록 -->
+<!-- My Workspace v1.6 · 2026-11-25 · Word(.docx)·Excel(.xlsx/.xls)·예전 PPT(.ppt) 미리보기 추가, PDF 새 탭 열기 -->
 <html lang="ko"><head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1372,6 +1372,33 @@
     .study-form { border-left: 1px solid #f1f5f9; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; }
     .study-form h3 { font-family: var(--font-heading); font-size: 14px; font-weight: 800; }
 
+    /* PPTX preview */
+    .pptx-preview { width: 100%; max-height: 64vh; overflow-y: auto; display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 4px 0; }
+    .pptx-slide-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .pptx-slide-no { font-size: 11px; font-weight: 800; color: var(--text-muted); align-self: flex-start; }
+    .pptx-slide { position: relative; overflow: hidden; border: 1px solid var(--border-color); border-radius: 4px; box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08); font-family: 'Malgun Gothic', var(--font-body), sans-serif; flex-shrink: 0; }
+    .pptx-note { font-size: 11px; color: var(--text-muted); margin-bottom: 8px; align-self: flex-start; }
+
+    /* Word / Excel / PPT(text) preview */
+    .docx-preview-holder { width: 100%; max-height: 64vh; overflow: auto; background: #e2e8f0; border-radius: 8px; }
+    .docx-preview-holder .docx-wrapper { background: #e2e8f0; padding: 16px; }
+    .docx-preview-holder .docx-wrapper > section.docx { box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12); margin-bottom: 16px; }
+    .xl-preview { width: 100%; }
+    .xl-tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; }
+    .xl-tab { font-size: 12px; font-weight: 700; padding: 5px 12px; border: 1px solid var(--border-color); background: #ffffff; border-radius: 6px 6px 0 0; cursor: pointer; color: var(--text-sub); font-family: inherit; }
+    .xl-tab.active { background: #ecfdf5; border-color: #6ee7b7; color: #047857; }
+    .xl-scroll { width: 100%; max-height: 58vh; overflow: auto; border: 1px solid var(--border-color); border-radius: 6px; }
+    .xl-table { border-collapse: collapse; font-size: 12px; min-width: 100%; }
+    .xl-table th, .xl-table td { border: 1px solid #e2e8f0; padding: 4px 8px; white-space: nowrap; max-width: 320px; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+    .xl-table thead th { position: sticky; top: 0; background: #f1f5f9; color: var(--text-muted); font-weight: 700; text-align: center; z-index: 1; }
+    .xl-table tbody th { position: sticky; left: 0; background: #f8fafc; color: var(--text-muted); font-weight: 700; text-align: center; min-width: 36px; }
+    .xl-table th.xl-corner { left: 0; z-index: 2; }
+    .xl-table td.xl-num { text-align: right; font-variant-numeric: tabular-nums; }
+    .xl-table td.xl-formula { color: var(--text-muted); font-style: italic; }
+    .ppt-text-card { width: 100%; background: #ffffff; border: 1px solid var(--border-color); border-radius: 6px; padding: 18px 22px; min-height: 160px; box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06); }
+    .ppt-text-title { font-family: var(--font-heading); font-size: 18px; font-weight: 800; margin-bottom: 10px; }
+    .ppt-text-body { font-size: 13px; line-height: 1.6; color: var(--text-main); margin-bottom: 6px; }
+
     /* Toast */
     #toast {
       position: fixed;
@@ -2287,6 +2314,7 @@
         URL.revokeObjectURL(currentPreviewBlobUrl);
         currentPreviewBlobUrl = null;
       }
+      revokePreviewExtraUrls();
 
       const titleEl = document.getElementById('previewModalTitle');
       const bodyEl = document.getElementById('previewModalBody');
@@ -2319,17 +2347,89 @@
         if (mime.startsWith('image/') || ['PNG','JPG','JPEG','GIF','WEBP','SVG'].includes(ext)) {
           bodyEl.innerHTML = `<img src="${currentPreviewBlobUrl}" alt="${escapeHtml(doc.name)}" style="max-width:100%; max-height:62vh; border-radius:8px; border:1px solid var(--border-color);" />`;
         } else if (mime === 'application/pdf' || ext === 'PDF') {
-          bodyEl.innerHTML = `<iframe src="${currentPreviewBlobUrl}" style="width:100%; height:62vh; border:1px solid var(--border-color); border-radius:8px;"></iframe>`;
+          const pdfUrl = URL.createObjectURL(new Blob([rec.blob], { type: 'application/pdf' }));
+          previewExtraUrls.push(pdfUrl);
+          bodyEl.innerHTML = `
+            <div class="pptx-note" style="width:100%; display:flex; justify-content:space-between; align-items:center;">
+              <span>PDF · 브라우저 내장 뷰어로 표시합니다.</span>
+              <a class="btn sm" href="${pdfUrl}" target="_blank" rel="noopener"><i class="fa-solid fa-up-right-from-square"></i> 새 탭에서 크게 보기</a>
+            </div>
+            <iframe src="${pdfUrl}" style="width:100%; height:62vh; border:1px solid var(--border-color); border-radius:8px;"></iframe>`;
+        } else if (['DOCX', 'XLSX', 'XLSM', 'XLS', 'PPT'].includes(ext) ||
+                   mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+                   mime === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+                   mime === 'application/vnd.ms-excel' || mime === 'application/vnd.ms-powerpoint') {
+          const kind = (ext === 'DOCX' || mime.includes('wordprocessingml')) ? 'docx'
+            : (ext === 'PPT' || mime === 'application/vnd.ms-powerpoint') ? 'ppt' : 'sheet';
+          const labels = { docx: '문서를 그리는 중...', sheet: '표를 읽는 중...', ppt: '슬라이드 글자를 읽는 중...' };
+          bodyEl.innerHTML = `<p style="color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> ${labels[kind]}</p>`;
+          const holder = document.createElement('div');
+          holder.className = kind === 'docx' ? 'docx-preview-holder' : (kind === 'sheet' ? 'xl-preview' : 'pptx-preview');
+          try {
+            let noteText = '';
+            if (kind === 'docx') {
+              bodyEl.innerHTML = '';
+              bodyEl.appendChild(holder);
+              await renderDocxPreview(rec.blob, holder);
+              noteText = 'Word 미리보기입니다. 쪽 나눔·일부 서식은 실제 Word와 다를 수 있습니다.';
+            } else if (kind === 'sheet') {
+              bodyEl.innerHTML = '';
+              bodyEl.appendChild(holder);
+              const n = await renderSheetPreview(rec.blob, holder);
+              noteText = `Excel 미리보기 · 시트 ${n}개 · 값만 표시합니다 (색·테두리·차트는 표시하지 않음).`;
+            } else {
+              bodyEl.innerHTML = '';
+              bodyEl.appendChild(holder);
+              const n = await renderLegacyPptPreview(rec.blob, holder);
+              noteText = `예전 PowerPoint 형식(.ppt) · 슬라이드 ${n}장 · 글자만 표시합니다. 그림·도형까지 보려면 PowerPoint에서 .pptx로 저장해 다시 올려주세요.`;
+            }
+            const note = document.createElement('p');
+            note.className = 'pptx-note';
+            note.style.width = '100%';
+            note.textContent = noteText;
+            bodyEl.insertBefore(note, holder);
+          } catch (e) {
+            console.warn('미리보기 실패:', e);
+            bodyEl.innerHTML = `
+              <div style="text-align:center; padding:28px;">
+                <i class="fa-regular fa-file" style="font-size:42px; color:var(--primary); margin-bottom:12px;"></i>
+                <p style="font-weight:800; font-size:14px; margin-bottom:6px;">${escapeHtml(doc.name)}</p>
+                <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">미리보기를 만들지 못했습니다. (인터넷 연결 또는 파일 형식 문제)<br>아래 버튼으로 내려받아 열어주세요.</p>
+                <button class="btn primary" onclick="downloadDocFile('${doc.id}')"><i class="fa-solid fa-download"></i> 파일 다운로드</button>
+              </div>`;
+          }
+        } else if (ext === 'PPTX' || mime === 'application/vnd.openxmlformats-officedocument.presentationml.presentation') {
+          bodyEl.innerHTML = `<p style="color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> 슬라이드를 그리는 중...</p>`;
+          const holder = document.createElement('div');
+          holder.className = 'pptx-preview';
+          try {
+            bodyEl.innerHTML = '';
+            bodyEl.appendChild(holder);
+            const total = await renderPptxPreview(rec.blob, holder);
+            const note = document.createElement('p');
+            note.className = 'pptx-note';
+            note.innerHTML = `슬라이드 ${total}장 · 간이 미리보기입니다. 글꼴·차트·도형 효과·애니메이션은 실제 PowerPoint와 다를 수 있습니다.`;
+            bodyEl.insertBefore(note, holder);
+          } catch (e) {
+            console.warn('PPTX 미리보기 실패:', e);
+            bodyEl.innerHTML = `
+              <div style="text-align:center; padding:28px;">
+                <i class="fa-regular fa-file-powerpoint" style="font-size:42px; color:var(--primary); margin-bottom:12px;"></i>
+                <p style="font-weight:800; font-size:14px; margin-bottom:6px;">${escapeHtml(doc.name)}</p>
+                <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">슬라이드를 그리지 못했습니다. (인터넷 연결 또는 파일 형식 문제)<br>아래 버튼으로 내려받아 PowerPoint에서 열어주세요.</p>
+                <button class="btn primary" onclick="downloadDocFile('${doc.id}')"><i class="fa-solid fa-download"></i> 파일 다운로드</button>
+              </div>`;
+          }
         } else if (mime.startsWith('text/') || ['TXT','CSV','MD','JSON','HTML'].includes(ext)) {
           const text = await rec.blob.text();
           bodyEl.innerHTML = `<pre style="width:100%; max-height:60vh; overflow:auto; background:#f8fafc; border:1px solid var(--border-color); padding:14px; border-radius:8px; font-size:12px; white-space:pre-wrap; text-align:left;">${escapeHtml(text.slice(0, 50000))}</pre>`;
         } else {
           bodyEl.innerHTML = `
             <div style="text-align:center; padding:28px;">
-              <i class="fa-regular fa-file-powerpoint" style="font-size:42px; color:var(--primary); margin-bottom:12px;"></i>
+              <i class="fa-regular fa-file" style="font-size:42px; color:var(--primary); margin-bottom:12px;"></i>
               <p style="font-weight:800; font-size:14px; margin-bottom:6px;">${escapeHtml(doc.name)}</p>
               <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">
-                ${escapeHtml(ext)} (${formatBytes(rec.size)}) 형식은 브라우저에서 직접 미리보기를 지원하지 않습니다.<br>아래 다운로드 버튼으로 파일을 내려받아 열어주세요.
+                ${escapeHtml(ext)} (${formatBytes(rec.size)}) 형식은 브라우저에서 미리보기를 지원하지 않습니다.<br>${ext === 'DOC' ? '예전 Word 형식(.doc)은 Word에서 .docx로 저장해 다시 올리면 미리보기가 됩니다.<br>' : ''}${['HWP', 'HWPX'].includes(ext) ? '한글 파일은 한글에서 PDF로 저장해 올리면 미리보기가 됩니다.<br>' : ''}아래 다운로드 버튼으로 파일을 내려받아 열어주세요.
               </p>
               <button class="btn primary" onclick="downloadDocFile('${doc.id}')"><i class="fa-solid fa-download"></i> 파일 다운로드</button>
             </div>
@@ -2341,6 +2441,7 @@
     }
 
     function closePreviewModal() {
+      revokePreviewExtraUrls();
       if (currentPreviewBlobUrl) {
         URL.revokeObjectURL(currentPreviewBlobUrl);
         currentPreviewBlobUrl = null;
@@ -5290,6 +5391,695 @@
       const label = days === 0 ? '오늘' : `${days}일 전`;
       badge.textContent = `브라우저 저장 · 마지막 백업 ${d.getMonth() + 1}/${d.getDate()} (${label})`;
       badge.classList.toggle('warn', days >= 7);
+    }
+
+    // 15. PPTX PREVIEW (브라우저 안에서 슬라이드를 간이 렌더링, JSZip은 필요할 때만 로드)
+    const JSZIP_SOURCES = [
+      'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
+      'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js'
+    ];
+    let previewExtraUrls = [];   // 슬라이드 이미지용 blob URL (미리보기 닫을 때 해제)
+
+    // 미리보기용 라이브러리는 필요할 때만 불러온다 (주소 여러 개를 차례로 시도)
+    const scriptLoadPromises = {};
+    function loadScriptOnce(globalName, sources) {
+      if (window[globalName]) return Promise.resolve(window[globalName]);
+      if (scriptLoadPromises[globalName]) return scriptLoadPromises[globalName];
+      scriptLoadPromises[globalName] = (async () => {
+        for (const src of sources) {
+          try {
+            await new Promise((resolve, reject) => {
+              const s = document.createElement('script');
+              s.src = src;
+              s.onload = resolve;
+              s.onerror = reject;
+              document.head.appendChild(s);
+            });
+            if (window[globalName]) return window[globalName];
+          } catch (e) { /* 다음 주소 시도 */ }
+        }
+        delete scriptLoadPromises[globalName];
+        throw new Error(`${globalName} 라이브러리를 불러오지 못했습니다.`);
+      })();
+      return scriptLoadPromises[globalName];
+    }
+
+    function loadJSZip() {
+      return loadScriptOnce('JSZip', JSZIP_SOURCES);
+    }
+
+    const DOCX_PREVIEW_SOURCES = [
+      'https://cdn.jsdelivr.net/npm/docx-preview@0.4.1/dist/docx-preview.min.js',
+      'https://unpkg.com/docx-preview@0.4.1/dist/docx-preview.min.js'
+    ];
+    const SHEETJS_SOURCES = [
+      'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+      'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'
+    ];
+
+    async function loadDocxPreview() {
+      await loadJSZip();
+      return loadScriptOnce('docx', DOCX_PREVIEW_SOURCES);
+    }
+
+    function loadSheetJS() {
+      return loadScriptOnce('XLSX', SHEETJS_SOURCES);
+    }
+
+    function revokePreviewExtraUrls() {
+      previewExtraUrls.forEach(u => URL.revokeObjectURL(u));
+      previewExtraUrls = [];
+    }
+
+    // XML 헬퍼 (네임스페이스 접두어와 관계없이 localName으로 찾음)
+    const xKids = (el, name) => el ? Array.from(el.children).filter(c => c.localName === name) : [];
+    const xKid = (el, name) => xKids(el, name)[0] || null;
+    const xFind = (el, name) => el ? (el.getElementsByTagNameNS('*', name)[0] || null) : null;
+    const xFindAll = (el, name) => el ? Array.from(el.getElementsByTagNameNS('*', name)) : [];
+    const xPath = (el, names) => names.reduce((cur, n) => xKid(cur, n), el);
+
+    function resolveZipPath(baseDir, target) {
+      if (target.startsWith('/')) return target.slice(1);
+      const parts = (baseDir ? baseDir.split('/') : []);
+      target.split('/').forEach(seg => {
+        if (seg === '..') parts.pop();
+        else if (seg && seg !== '.') parts.push(seg);
+      });
+      return parts.join('/');
+    }
+
+    async function renderPptxPreview(blob, container) {
+      const JSZip = await loadJSZip();
+      const zip = await JSZip.loadAsync(blob);
+      const parser = new DOMParser();
+      const xmlCache = {};
+      const readXml = async (path) => {
+        if (path in xmlCache) return xmlCache[path];
+        const f = zip.file(path);
+        xmlCache[path] = f ? parser.parseFromString(await f.async('text'), 'application/xml') : null;
+        return xmlCache[path];
+      };
+      const relsOf = async (path) => {
+        const dir = path.substring(0, path.lastIndexOf('/'));
+        const base = path.substring(path.lastIndexOf('/') + 1);
+        const doc = await readXml(`${dir}/_rels/${base}.rels`);
+        const map = {};
+        xFindAll(doc, 'Relationship').forEach(r => {
+          if (r.getAttribute('TargetMode') === 'External') return;
+          map[r.getAttribute('Id')] = { target: resolveZipPath(dir, r.getAttribute('Target')), type: r.getAttribute('Type') || '' };
+        });
+        return map;
+      };
+      const relByType = (rels, suffix) => Object.values(rels).find(r => r.type.endsWith(suffix));
+      const mediaUrlCache = {};
+      const mediaUrl = async (path) => {
+        if (mediaUrlCache[path]) return mediaUrlCache[path];
+        const f = zip.file(path);
+        if (!f) return '';
+        const ext = path.split('.').pop().toLowerCase();
+        const mimeMap = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', bmp: 'image/bmp', svg: 'image/svg+xml', webp: 'image/webp' };
+        if (!mimeMap[ext]) return '';   // emf/wmf 등은 브라우저가 못 그림
+        const url = URL.createObjectURL(new Blob([await f.async('arraybuffer')], { type: mimeMap[ext] }));
+        previewExtraUrls.push(url);
+        mediaUrlCache[path] = url;
+        return url;
+      };
+
+      const pres = await readXml('ppt/presentation.xml');
+      if (!pres) throw new Error('presentation.xml 없음');
+      const sldSz = xFind(pres, 'sldSz');
+      const W = Number(sldSz && sldSz.getAttribute('cx')) || 12192000;
+      const H = Number(sldSz && sldSz.getAttribute('cy')) || 6858000;
+      const presRels = await relsOf('ppt/presentation.xml');
+      const slidePaths = xFindAll(pres, 'sldId')
+        .map(n => presRels[n.getAttribute('r:id')])
+        .filter(Boolean)
+        .map(r => r.target);
+      if (slidePaths.length === 0) throw new Error('슬라이드 없음');
+
+      // 테마 색
+      const theme = {};
+      const firstMasterRel = relByType(presRels, '/slideMaster');
+      let themePath = 'ppt/theme/theme1.xml';
+      if (firstMasterRel) {
+        const t = relByType(await relsOf(firstMasterRel.target), '/theme');
+        if (t) themePath = t.target;
+      }
+      const themeDoc = await readXml(themePath);
+      const clrScheme = xFind(themeDoc, 'clrScheme');
+      if (clrScheme) {
+        Array.from(clrScheme.children).forEach(c => {
+          const v = xKid(c, 'srgbClr') ? xKid(c, 'srgbClr').getAttribute('val') : (xKid(c, 'sysClr') ? xKid(c, 'sysClr').getAttribute('lastClr') : null);
+          if (v) theme[c.localName] = '#' + v;
+        });
+      }
+      const schemeAlias = { tx1: 'dk1', bg1: 'lt1', tx2: 'dk2', bg2: 'lt2' };
+
+      const applyLum = (hex, mod, off) => {
+        let r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255;
+        const max = Math.max(r, g, b), min = Math.min(r, g, b);
+        let h = 0, s = 0, l = (max + min) / 2;
+        if (max !== min) {
+          const d = max - min;
+          s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+          h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+          h /= 6;
+        }
+        l = Math.max(0, Math.min(1, l * mod + off));
+        const hue2rgb = (p, q, t) => {
+          if (t < 0) t += 1;
+          if (t > 1) t -= 1;
+          if (t < 1 / 6) return p + (q - p) * 6 * t;
+          if (t < 1 / 2) return q;
+          if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+          return p;
+        };
+        if (s === 0) { r = g = b = l; } else {
+          const q = l < 0.5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q;
+          r = hue2rgb(p, q, h + 1 / 3); g = hue2rgb(p, q, h); b = hue2rgb(p, q, h - 1 / 3);
+        }
+        return '#' + [r, g, b].map(x => Math.round(x * 255).toString(16).padStart(2, '0')).join('');
+      };
+
+      // solidFill 같은 요소 안의 색 → CSS 색
+      const colorIn = (el) => {
+        if (!el) return null;
+        const c = xKid(el, 'srgbClr') || xKid(el, 'schemeClr') || xKid(el, 'sysClr') || xKid(el, 'prstClr');
+        if (!c) return null;
+        let hex = null;
+        if (c.localName === 'srgbClr') hex = '#' + c.getAttribute('val');
+        else if (c.localName === 'sysClr') hex = '#' + (c.getAttribute('lastClr') || '000000');
+        else if (c.localName === 'schemeClr') {
+          const key = schemeAlias[c.getAttribute('val')] || c.getAttribute('val');
+          hex = theme[key] || null;
+        } else if (c.localName === 'prstClr') {
+          return c.getAttribute('val');
+        }
+        if (!hex || hex.length !== 7) return hex;
+        const mod = xKid(c, 'lumMod'), off = xKid(c, 'lumOff');
+        if (mod || off) hex = applyLum(hex, mod ? Number(mod.getAttribute('val')) / 100000 : 1, off ? Number(off.getAttribute('val')) / 100000 : 0);
+        return hex;
+      };
+
+      const getXfrm = (shapeEl) => {
+        const holder = xKid(shapeEl, 'spPr') || xKid(shapeEl, 'grpSpPr');
+        const x = holder ? xKid(holder, 'xfrm') : xKid(shapeEl, 'xfrm');
+        if (!x) return null;
+        const off = xKid(x, 'off'), ext = xKid(x, 'ext');
+        if (!off || !ext) return null;
+        return {
+          x: Number(off.getAttribute('x')), y: Number(off.getAttribute('y')),
+          cx: Number(ext.getAttribute('cx')), cy: Number(ext.getAttribute('cy')),
+          rot: Number(x.getAttribute('rot') || 0) / 60000,
+          node: x
+        };
+      };
+      const phOf = (shapeEl) => {
+        const nv = xKid(shapeEl, 'nvSpPr') || xKid(shapeEl, 'nvPicPr') || xKid(shapeEl, 'nvGraphicFramePr');
+        const ph = nv ? xFind(nv, 'ph') : null;
+        return ph ? { type: ph.getAttribute('type') || 'body', idx: ph.getAttribute('idx') || '' } : null;
+      };
+      const phKind = (type) => (type === 'title' || type === 'ctrTitle') ? 'title' : (['body', 'obj', 'subTitle'].includes(type) ? 'body' : 'other');
+
+      const collectPh = (spTree) => {
+        const list = [];
+        if (!spTree) return list;
+        Array.from(spTree.children).forEach(el => {
+          const ph = phOf(el);
+          if (ph) list.push({ ph, el, xfrm: getXfrm(el) });
+        });
+        return list;
+      };
+      const findPh = (lists, ph) => {
+        for (const list of lists) {
+          let m = ph.idx ? list.find(p => p.ph.idx === ph.idx && p.xfrm) : null;
+          if (!m) m = list.find(p => phKind(p.ph.type) === phKind(ph.type) && p.ph.type === ph.type && p.xfrm);
+          if (!m) m = list.find(p => phKind(p.ph.type) === phKind(ph.type) && p.xfrm);
+          if (m) return m;
+        }
+        return null;
+      };
+
+      const masterInfoCache = {};
+      const getMasterInfo = async (masterPath) => {
+        if (masterInfoCache[masterPath]) return masterInfoCache[masterPath];
+        const doc = await readXml(masterPath);
+        const tx = xFind(doc, 'txStyles');
+        const styleSz = (styleName, lvl) => {
+          const st = xKid(tx, styleName);
+          const lv = st ? xKid(st, `lvl${lvl}pPr`) : null;
+          const d = lv ? xKid(lv, 'defRPr') : null;
+          return d && d.getAttribute('sz') ? Number(d.getAttribute('sz')) / 100 : null;
+        };
+        const styleColor = (styleName) => {
+          const st = xKid(tx, styleName);
+          const lv = st ? xKid(st, 'lvl1pPr') : null;
+          const d = lv ? xKid(lv, 'defRPr') : null;
+          return d ? colorIn(xKid(d, 'solidFill')) : null;
+        };
+        const info = {
+          doc,
+          rels: await relsOf(masterPath),
+          spTree: xFind(doc, 'spTree'),
+          sz: {
+            title: [1, 2, 3, 4, 5].map(l => styleSz('titleStyle', l)),
+            body: [1, 2, 3, 4, 5].map(l => styleSz('bodyStyle', l)),
+            other: [1, 2, 3, 4, 5].map(l => styleSz('otherStyle', l))
+          },
+          color: { title: styleColor('titleStyle'), body: styleColor('bodyStyle'), other: styleColor('otherStyle') }
+        };
+        masterInfoCache[masterPath] = info;
+        return info;
+      };
+
+      const bgOf = async (doc, rels) => {
+        const bg = xFind(doc, 'bg');
+        if (!bg) return null;
+        const bgPr = xKid(bg, 'bgPr');
+        if (bgPr) {
+          const solid = xKid(bgPr, 'solidFill');
+          if (solid) return { color: colorIn(solid) };
+          const blip = xFind(bgPr, 'blip');
+          if (blip && rels[blip.getAttribute('r:embed')]) return { image: await mediaUrl(rels[blip.getAttribute('r:embed')].target) };
+          const grad = xFind(bgPr, 'gs');
+          if (grad) return { color: colorIn(grad) };
+        }
+        const bgRef = xKid(bg, 'bgRef');
+        if (bgRef) return { color: colorIn(bgRef) };
+        return null;
+      };
+
+      // 슬라이드 한 장 렌더링
+      const slideWidthPx = Math.max(320, Math.min(container.clientWidth || 800, 860) - 4);
+      const scale = slideWidthPx / W;
+      const px = (emu) => (emu * scale).toFixed(2) + 'px';
+      const ptToPx = (pt) => pt * 12700 * scale;
+
+      const renderText = (txBody, ctx) => {
+        if (!txBody) return '';
+        const bodyPr = xKid(txBody, 'bodyPr');
+        const auto = bodyPr ? xKid(bodyPr, 'normAutofit') : null;
+        const fontScale = auto && auto.getAttribute('fontScale') ? Number(auto.getAttribute('fontScale')) / 100000 : 1;
+        const lstStyle = xKid(txBody, 'lstStyle');
+        return xKids(txBody, 'p').map(p => {
+          const pPr = xKid(p, 'pPr');
+          const lvl = pPr && pPr.getAttribute('lvl') ? Number(pPr.getAttribute('lvl')) : 0;
+          const algn = pPr ? pPr.getAttribute('algn') : null;
+          const lstLv = lstStyle ? xKid(lstStyle, `lvl${lvl + 1}pPr`) : null;
+          const lstDef = lstLv ? xKid(lstLv, 'defRPr') : null;
+          const endPr = xKid(p, 'endParaRPr');
+          const defSz = (lstDef && lstDef.getAttribute('sz') ? Number(lstDef.getAttribute('sz')) / 100 : null) ||
+            (ctx.inheritSz ? ctx.inheritSz[lvl] || ctx.inheritSz[0] : null) || ctx.fallbackSz;
+          const textAlign = { ctr: 'center', r: 'right', just: 'justify' }[algn] || ctx.defaultAlign || 'left';
+          const runs = Array.from(p.children).filter(c => c.localName === 'r' || c.localName === 'br' || c.localName === 'fld');
+          let maxSz = 0;
+          const runHtml = runs.map(r => {
+            if (r.localName === 'br') return '<br>';
+            const rPr = xKid(r, 'rPr');
+            const t = xKid(r, 't');
+            const sz = (rPr && rPr.getAttribute('sz') ? Number(rPr.getAttribute('sz')) / 100 : defSz) * fontScale;
+            maxSz = Math.max(maxSz, sz);
+            const color = (rPr && colorIn(xKid(rPr, 'solidFill'))) || (lstDef && colorIn(xKid(lstDef, 'solidFill'))) || ctx.defaultColor || '#000000';
+            const bold = rPr && rPr.getAttribute('b') === '1' ? 'font-weight:700;' : (ctx.boldDefault ? 'font-weight:700;' : '');
+            const italic = rPr && rPr.getAttribute('i') === '1' ? 'font-style:italic;' : '';
+            const under = rPr && rPr.getAttribute('u') && rPr.getAttribute('u') !== 'none' ? 'text-decoration:underline;' : '';
+            return `<span style="font-size:${ptToPx(sz).toFixed(2)}px; color:${color}; ${bold}${italic}${under}">${escapeHtml(t ? t.textContent : '')}</span>`;
+          }).join('');
+          const emptySz = ((endPr && endPr.getAttribute('sz') ? Number(endPr.getAttribute('sz')) / 100 : defSz) * fontScale);
+          const hasText = runs.some(r => r.localName !== 'br' && xKid(r, 't') && xKid(r, 't').textContent.trim());
+          const buNone = pPr && xKid(pPr, 'buNone');
+          const buChar = pPr && xKid(pPr, 'buChar');
+          const showBullet = hasText && !buNone && (buChar || ctx.bullets);
+          const bulletChar = buChar ? buChar.getAttribute('char') : '•';
+          const lineH = ptToPx(maxSz || emptySz) * 1.18;
+          return `<div style="text-align:${textAlign}; margin-left:${(lvl * ptToPx(18)).toFixed(1)}px; line-height:${lineH.toFixed(1)}px; min-height:${(ptToPx(emptySz) * 1.18).toFixed(1)}px; ${showBullet ? `padding-left:${ptToPx((maxSz || emptySz) * 0.9).toFixed(1)}px; text-indent:-${ptToPx((maxSz || emptySz) * 0.9).toFixed(1)}px;` : ''}">` +
+            (showBullet ? `<span style="font-size:${ptToPx(maxSz || emptySz).toFixed(1)}px; color:${ctx.defaultColor || '#000'};">${escapeHtml(bulletChar)} </span>` : '') +
+            runHtml + `</div>`;
+        }).join('');
+      };
+
+      const renderShapes = async (spTree, ctx, transform, skipPlaceholders) => {
+        if (!spTree) return '';
+        let html = '';
+        for (const el of Array.from(spTree.children)) {
+          const name = el.localName;
+          if (!['sp', 'pic', 'graphicFrame', 'grpSp', 'cxnSp'].includes(name)) continue;
+          const ph = phOf(el);
+          if (skipPlaceholders && ph) continue;
+          let xf = getXfrm(el);
+          let inherited = null;
+          if (ph) inherited = findPh(ctx.phLists, ph);
+          if (!xf && inherited) xf = inherited.xfrm;
+
+          if (name === 'grpSp') {
+            if (!xf) continue;
+            const chOff = xKid(xf.node, 'chOff'), chExt = xKid(xf.node, 'chExt');
+            const cox = chOff ? Number(chOff.getAttribute('x')) : xf.x, coy = chOff ? Number(chOff.getAttribute('y')) : xf.y;
+            const cex = chExt ? Number(chExt.getAttribute('cx')) || xf.cx : xf.cx, cey = chExt ? Number(chExt.getAttribute('cy')) || xf.cy : xf.cy;
+            const sx = xf.cx / cex, sy = xf.cy / cey;
+            const outer = transform;
+            const inner = (b) => outer({ x: xf.x + (b.x - cox) * sx, y: xf.y + (b.y - coy) * sy, cx: b.cx * sx, cy: b.cy * sy, rot: b.rot });
+            html += await renderShapes(el, ctx, inner, false);
+            continue;
+          }
+          if (!xf) continue;
+          const b = transform(xf);
+          const boxStyle = `position:absolute; left:${px(b.x)}; top:${px(b.y)}; width:${px(b.cx)}; height:${px(b.cy)};${b.rot ? ` transform:rotate(${b.rot}deg);` : ''}`;
+
+          if (name === 'pic') {
+            const blip = xFind(el, 'blip');
+            const rid = blip ? blip.getAttribute('r:embed') : null;
+            const url = rid && ctx.rels[rid] ? await mediaUrl(ctx.rels[rid].target) : '';
+            html += url
+              ? `<img src="${url}" alt="" style="${boxStyle} object-fit:fill;">`
+              : `<div style="${boxStyle} background:#f1f5f9; border:1px dashed #cbd5e1; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:11px;">이미지</div>`;
+            continue;
+          }
+
+          if (name === 'graphicFrame') {
+            const tbl = xFind(el, 'tbl');
+            if (tbl) {
+              const cols = xFindAll(xKid(tbl, 'tblGrid'), 'gridCol').map(c => Number(c.getAttribute('w')));
+              const tblPr = xKid(tbl, 'tblPr');
+              const firstRow = tblPr && tblPr.getAttribute('firstRow') === '1';
+              const bandRow = tblPr && tblPr.getAttribute('bandRow') === '1';
+              const hasStyle = tblPr && xKid(tblPr, 'tableStyleId');
+              const headFill = theme.accent1 || '#4472c4';
+              const rowsHtml = xKids(tbl, 'tr').map((tr, ri) => {
+                const h = Number(tr.getAttribute('h')) || 0;
+                const isHead = hasStyle && firstRow && ri === 0;
+                const isBand = hasStyle && bandRow && !isHead && (ri - (firstRow ? 1 : 0)) % 2 === 0;
+                return `<tr style="height:${px(h)}">` + xKids(tr, 'tc').map(tc => {
+                  if (tc.getAttribute('hMerge') === '1' || tc.getAttribute('vMerge') === '1') return '';
+                  const tcPr = xKid(tc, 'tcPr');
+                  let fill = tcPr ? colorIn(xKid(tcPr, 'solidFill')) : null;
+                  if (!fill && isHead) fill = headFill;
+                  if (!fill && isBand) fill = applyLum(headFill.length === 7 ? headFill : '#4472c4', 0.2, 0.8);
+                  const span = tc.getAttribute('gridSpan') ? ` colspan="${tc.getAttribute('gridSpan')}"` : '';
+                  const rspan = tc.getAttribute('rowSpan') ? ` rowspan="${tc.getAttribute('rowSpan')}"` : '';
+                  return `<td${span}${rspan} style="border:1px solid #cbd5e1; padding:${px(45720)} ${px(91440)}; vertical-align:top; ${fill ? `background:${fill};` : ''}">${renderText(xKid(tc, 'txBody'), { ...ctx.textCtx.other, fallbackSz: 14, ...(isHead ? { defaultColor: '#ffffff', boldDefault: true } : {}) })}</td>`;
+                }).join('') + '</tr>';
+              }).join('');
+              html += `<div style="${boxStyle} overflow:hidden;"><table style="border-collapse:collapse; width:${px(cols.reduce((a, c) => a + c, 0))}; table-layout:fixed;"><colgroup>${cols.map(w => `<col style="width:${px(w)}">`).join('')}</colgroup>${rowsHtml}</table></div>`;
+            } else {
+              const isChart = !!xFind(el, 'chart');
+              html += `<div style="${boxStyle} background:#f8fafc; border:1px dashed #cbd5e1; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:12px;">${isChart ? '차트 (미리보기 미지원)' : '개체'}</div>`;
+            }
+            continue;
+          }
+
+          // sp / cxnSp
+          const spPr = xKid(el, 'spPr');
+          const geom = spPr ? xKid(spPr, 'prstGeom') : null;
+          const prst = geom ? geom.getAttribute('prst') : 'rect';
+          let fill = null;
+          if (spPr && xKid(spPr, 'solidFill')) fill = colorIn(xKid(spPr, 'solidFill'));
+          else if (spPr && xKid(spPr, 'gradFill')) fill = colorIn(xFind(xKid(spPr, 'gradFill'), 'gs'));
+          else if (!spPr || !xKid(spPr, 'noFill')) {
+            const style = xKid(el, 'style');
+            const fillRef = style ? xKid(style, 'fillRef') : null;
+            if (fillRef && fillRef.getAttribute('idx') !== '0' && !ph && name === 'sp') fill = colorIn(fillRef);
+          }
+          let border = '';
+          const ln = spPr ? xKid(spPr, 'ln') : null;
+          const lnColor = ln && !xKid(ln, 'noFill') ? colorIn(xKid(ln, 'solidFill')) : null;
+          const lnW = ln && ln.getAttribute('w') ? Math.max(1, Number(ln.getAttribute('w')) * scale) : 1;
+          if (lnColor) border = `border:${lnW.toFixed(1)}px solid ${lnColor};`;
+          else if (!ln && !ph && name === 'sp') {
+            const style = xKid(el, 'style');
+            const lnRef = style ? xKid(style, 'lnRef') : null;
+            if (lnRef && lnRef.getAttribute('idx') !== '0') border = `border:1px solid ${colorIn(lnRef) || '#94a3b8'};`;
+          }
+          if (name === 'cxnSp' || prst === 'line' || prst.startsWith('straightConnector')) {
+            const c = lnColor || '#64748b';
+            html += `<div style="${boxStyle} height:0; border-top:${lnW.toFixed(1)}px solid ${c};"></div>`;
+            continue;
+          }
+          const radius = prst === 'ellipse' ? 'border-radius:50%;' : (prst === 'roundRect' ? `border-radius:${px(Math.min(b.cx, b.cy) * 0.12)};` : '');
+
+          const txBody = xKid(el, 'txBody');
+          const bodyPr = txBody ? xKid(txBody, 'bodyPr') : null;
+          const inhBodyPr = inherited ? xFind(inherited.el, 'bodyPr') : null;
+          const anchor = (bodyPr && bodyPr.getAttribute('anchor')) || (inhBodyPr && inhBodyPr.getAttribute('anchor')) || (ph && phKind(ph.type) === 'title' ? 'ctr' : 't');
+          const ins = (k, d) => bodyPr && bodyPr.getAttribute(k) ? Number(bodyPr.getAttribute(k)) : d;
+          const kind = ph ? phKind(ph.type) : 'other';
+          const inhLst = inherited ? xFind(inherited.el, 'lstStyle') : null;
+          const inhSz = [];
+          if (inhLst) [1, 2, 3, 4, 5].forEach(l => {
+            const lv = xKid(inhLst, `lvl${l}pPr`);
+            const d = lv ? xKid(lv, 'defRPr') : null;
+            inhSz.push(d && d.getAttribute('sz') ? Number(d.getAttribute('sz')) / 100 : null);
+          });
+          const tctx = {
+            ...ctx.textCtx[kind],
+            inheritSz: inhSz.some(Boolean) ? inhSz.map((v, i) => v || ctx.textCtx[kind].inheritSz[i]) : ctx.textCtx[kind].inheritSz,
+            bullets: kind === 'body' && ph && ph.type !== 'subTitle',
+            defaultAlign: ph && (ph.type === 'ctrTitle' || ph.type === 'subTitle') ? 'center' : (!ph && fill ? 'center' : null)
+          };
+          if (!ph && fill && txBody) {
+            // 도형 안 글자색: 도형 스타일(fontRef) → 없으면 배경 밝기에 맞춰 흰색/검정
+            const style = xKid(el, 'style');
+            const fontRef = style ? xKid(style, 'fontRef') : null;
+            const refColor = fontRef ? colorIn(fontRef) : null;
+            if (refColor) tctx.defaultColor = refColor;
+            else if (/^#[0-9a-f]{6}$/i.test(fill)) {
+              const lum = (parseInt(fill.slice(1, 3), 16) * 299 + parseInt(fill.slice(3, 5), 16) * 587 + parseInt(fill.slice(5, 7), 16) * 114) / 1000;
+              tctx.defaultColor = lum < 150 ? '#ffffff' : '#0f172a';
+            }
+          }
+          const textHtml = renderText(txBody, tctx);
+          const justify = { t: 'flex-start', ctr: 'center', b: 'flex-end' }[anchor] || 'flex-start';
+          html += `<div style="${boxStyle} ${fill ? `background:${fill};` : ''}${border}${radius} box-sizing:border-box; display:flex; flex-direction:column; justify-content:${justify}; padding:${px(ins('tIns', 45720))} ${px(ins('rIns', 91440))} ${px(ins('bIns', 45720))} ${px(ins('lIns', 91440))}; overflow:hidden; word-break:keep-all; overflow-wrap:anywhere;">${textHtml}</div>`;
+        }
+        return html;
+      };
+
+      container.innerHTML = '';
+      const total = slidePaths.length;
+      const MAX_SLIDES = 60;
+      for (let i = 0; i < Math.min(total, MAX_SLIDES); i++) {
+        const path = slidePaths[i];
+        const slideDoc = await readXml(path);
+        const slideRels = await relsOf(path);
+        const layoutRel = relByType(slideRels, '/slideLayout');
+        const layoutDoc = layoutRel ? await readXml(layoutRel.target) : null;
+        const layoutRels = layoutRel ? await relsOf(layoutRel.target) : {};
+        const masterRel = relByType(layoutRels, '/slideMaster');
+        const master = masterRel ? await getMasterInfo(masterRel.target) : null;
+        const layoutTree = xFind(layoutDoc, 'spTree');
+
+        const textCtx = {
+          title: { inheritSz: master ? master.sz.title : [], fallbackSz: 40, defaultColor: (master && master.color.title) || theme.dk1 || '#000', boldDefault: false },
+          body: { inheritSz: master ? master.sz.body : [], fallbackSz: 20, defaultColor: (master && master.color.body) || theme.dk1 || '#000' },
+          other: { inheritSz: master ? master.sz.other : [], fallbackSz: 18, defaultColor: (master && master.color.other) || theme.dk1 || '#000' }
+        };
+        const phLists = [collectPh(layoutTree), collectPh(master && master.spTree)];
+        const bg = (await bgOf(slideDoc, slideRels)) || (layoutDoc && await bgOf(layoutDoc, layoutRels)) || (master && await bgOf(master.doc, master.rels)) || { color: theme.lt1 || '#ffffff' };
+
+        const identity = (xf) => xf;
+        const showMaster = (doc) => {
+          const sld = doc && doc.documentElement;
+          return !(sld && sld.getAttribute('showMasterSp') === '0');
+        };
+        let inner = '';
+        if (master && showMaster(slideDoc) && showMaster(layoutDoc)) {
+          inner += await renderShapes(master.spTree, { rels: master.rels, phLists: [], textCtx }, identity, true);
+        }
+        if (layoutDoc && showMaster(slideDoc)) {
+          inner += await renderShapes(layoutTree, { rels: layoutRels, phLists: [], textCtx }, identity, true);
+        }
+        inner += await renderShapes(xFind(slideDoc, 'spTree'), { rels: slideRels, phLists, textCtx }, identity, false);
+
+        const bgStyle = bg.image
+          ? `background:#fff url('${bg.image}') center/cover no-repeat;`
+          : `background:${bg.color || '#ffffff'};`;
+        const wrap = document.createElement('div');
+        wrap.className = 'pptx-slide-wrap';
+        wrap.innerHTML = `
+          <div class="pptx-slide-no">${i + 1} / ${total}</div>
+          <div class="pptx-slide" style="width:${slideWidthPx}px; height:${(H * scale).toFixed(1)}px; ${bgStyle}">${inner}</div>`;
+        container.appendChild(wrap);
+      }
+      if (total > MAX_SLIDES) {
+        const more = document.createElement('p');
+        more.className = 'pptx-note';
+        more.textContent = `슬라이드가 많아 앞의 ${MAX_SLIDES}장만 표시했습니다. 전체는 파일을 내려받아 확인하세요.`;
+        container.appendChild(more);
+      }
+      return total;
+    }
+
+    // 16. DOCX / XLSX / PPT(예전 형식) PREVIEW
+    async function renderDocxPreview(blob, container) {
+      const docxLib = await loadDocxPreview();
+      container.innerHTML = '';
+      await docxLib.renderAsync(await blob.arrayBuffer(), container, null, {
+        className: 'docx',
+        inWrapper: true,
+        ignoreWidth: false,
+        ignoreHeight: false,
+        breakPages: true,
+        ignoreLastRenderedPageBreak: true,
+        renderHeaders: true,
+        renderFooters: true,
+        renderFootnotes: true,
+        useBase64URL: true
+      });
+      // Symbol·Wingdings 글머리표(사설 영역 문자)는 브라우저에서 □로 보이므로 일반 기호로 바꿈
+      const bulletMap = { 'f0b7': '•', 'f0a7': '▪', 'f06e': '■', 'f0d8': '➢', 'f0fc': '✓', 'f076': '❖', 'f0a8': '○', 'f0e0': '→', 'f0a1': '○' };
+      container.querySelectorAll('style').forEach(st => {
+        st.textContent = st.textContent
+          .replace(/[\uF000-\uF0FF]/g, (ch) => bulletMap[ch.charCodeAt(0).toString(16)] || '•')
+          .replace(/font-family:\s*(Symbol|Wingdings[^;}]*)/gi, 'font-family: inherit');
+      });
+    }
+
+    async function renderSheetPreview(blob, container) {
+      const XLSX = await loadSheetJS();
+      const wb = XLSX.read(new Uint8Array(await blob.arrayBuffer()), { type: 'array', cellDates: true, cellNF: true, cellStyles: false });
+      const MAX_ROWS = 500;
+      const MAX_COLS = 60;
+      const colName = (c) => XLSX.utils.encode_col(c);
+
+      const sheetHtml = (ws) => {
+        if (!ws || !ws['!ref']) return '<p class="pptx-note" style="padding:12px;">빈 시트입니다.</p>';
+        const range = XLSX.utils.decode_range(ws['!ref']);
+        const lastRow = Math.min(range.e.r, range.s.r + MAX_ROWS - 1);
+        const lastCol = Math.min(range.e.c, range.s.c + MAX_COLS - 1);
+        const covered = new Set();
+        const spans = {};
+        (ws['!merges'] || []).forEach(m => {
+          spans[`${m.s.r},${m.s.c}`] = { rs: m.e.r - m.s.r + 1, cs: m.e.c - m.s.c + 1 };
+          for (let r = m.s.r; r <= m.e.r; r++) {
+            for (let c = m.s.c; c <= m.e.c; c++) {
+              if (r !== m.s.r || c !== m.s.c) covered.add(`${r},${c}`);
+            }
+          }
+        });
+        let head = '<tr><th class="xl-corner"></th>';
+        for (let c = range.s.c; c <= lastCol; c++) head += `<th>${colName(c)}</th>`;
+        head += '</tr>';
+        let body = '';
+        for (let r = range.s.r; r <= lastRow; r++) {
+          body += `<tr><th>${r + 1}</th>`;
+          for (let c = range.s.c; c <= lastCol; c++) {
+            const key = `${r},${c}`;
+            if (covered.has(key)) continue;
+            const cell = ws[XLSX.utils.encode_cell({ r, c })];
+            const sp = spans[key];
+            const spanAttr = sp ? `${sp.rs > 1 ? ` rowspan="${sp.rs}"` : ''}${sp.cs > 1 ? ` colspan="${sp.cs}"` : ''}` : '';
+            let text = '';
+            let cls = '';
+            if (cell) {
+              if (cell.w !== undefined && cell.w !== null) text = String(cell.w);
+              else if (cell.v !== undefined && cell.v !== null) text = cell.v instanceof Date ? toDateStr(cell.v) : String(cell.v);
+              if (text === '' && cell.f) {
+                text = '=' + cell.f;
+                cls = 'xl-formula';
+              }
+              if (cell.t === 'n' || cell.t === 'd') cls += ' xl-num';
+            }
+            body += `<td${spanAttr} class="${cls.trim()}">${escapeHtml(text)}</td>`;
+          }
+          body += '</tr>';
+        }
+        const cut = range.e.r > lastRow || range.e.c > lastCol
+          ? `<p class="pptx-note" style="margin-top:6px;">시트가 커서 ${MAX_ROWS}행 × ${MAX_COLS}열까지만 표시했습니다.</p>`
+          : '';
+        return `<div class="xl-scroll"><table class="xl-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>${cut}`;
+      };
+
+      const names = wb.SheetNames || [];
+      if (names.length === 0) throw new Error('시트 없음');
+      container.innerHTML = `
+        <div class="xl-tabs">${names.map((n, i) => `<button class="xl-tab ${i === 0 ? 'active' : ''}" data-idx="${i}">${escapeHtml(n)}</button>`).join('')}</div>
+        <div class="xl-sheet"></div>`;
+      const sheetEl = container.querySelector('.xl-sheet');
+      const show = (i) => {
+        sheetEl.innerHTML = sheetHtml(wb.Sheets[names[i]]);
+        container.querySelectorAll('.xl-tab').forEach(b => b.classList.toggle('active', Number(b.dataset.idx) === i));
+      };
+      container.querySelectorAll('.xl-tab').forEach(b => { b.onclick = () => show(Number(b.dataset.idx)); });
+      show(0);
+      return names.length;
+    }
+
+    // 예전 PowerPoint(.ppt, 바이너리) → 슬라이드별 글자만 추출
+    async function renderLegacyPptPreview(blob, container) {
+      const XLSX = await loadSheetJS();
+      const CFB = XLSX.CFB;
+      if (!CFB) throw new Error('CFB 없음');
+      const cfb = CFB.read(new Uint8Array(await blob.arrayBuffer()), { type: 'array' });
+      const entry = CFB.find(cfb, 'PowerPoint Document') || CFB.find(cfb, '/PowerPoint Document');
+      if (!entry || !entry.content) throw new Error('PowerPoint 스트림 없음');
+      const buf = entry.content instanceof Uint8Array ? entry.content : Uint8Array.from(entry.content);
+      const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+      const utf16 = new TextDecoder('utf-16le');
+
+      const slwtSlides = [];
+      const slideBoxes = [];
+      const cleanText = (s) => s.replace(/[\r\v\u000b]/g, '\n').replace(/\u0000/g, '').trim();
+
+      const walk = (start, end, ctx, depth) => {
+        let pos = start;
+        while (pos + 8 <= end) {
+          const verInst = dv.getUint16(pos, true);
+          const type = dv.getUint16(pos + 2, true);
+          const len = dv.getUint32(pos + 4, true);
+          const ver = verInst & 0x0F;
+          const inst = verInst >> 4;
+          const bStart = pos + 8;
+          const bEnd = Math.min(end, bStart + len);
+          if (bStart + len > end + 8 && len > buf.length) break;   // 깨진 레코드
+          if (type === 0x0FF0) {                       // SlideListWithText
+            walk(bStart, bEnd, inst === 0 ? { mode: 'slwt' } : { mode: 'skip' }, depth + 1);
+          } else if (type === 0x03F3 && ctx.mode === 'slwt') {   // SlidePersistAtom → 새 슬라이드
+            slwtSlides.push([]);
+          } else if (type === 0x0FA0 || type === 0x0FA8) {        // TextCharsAtom / TextBytesAtom
+            const bytes = buf.subarray(bStart, bEnd);
+            const text = cleanText(type === 0x0FA0 ? utf16.decode(bytes) : Array.from(bytes, b => String.fromCharCode(b)).join(''));
+            if (text) {
+              if (ctx.mode === 'slwt' && slwtSlides.length) slwtSlides[slwtSlides.length - 1].push(text);
+              else if (ctx.mode === 'slide') ctx.list.push(text);
+            }
+          } else if (type === 0x03EE) {                // Slide
+            const list = [];
+            slideBoxes.push(list);
+            walk(bStart, bEnd, { mode: 'slide', list }, depth + 1);
+          } else if (type === 0x03F8 || type === 0x03F0 || type === 0x0FC9 || type === 0x0FF2) {
+            // MainMaster / Notes / Handout / 문서 정보: 건너뜀
+          } else if (ver === 0x0F && depth < 12) {
+            walk(bStart, bEnd, ctx, depth + 1);
+          }
+          pos = bStart + len;
+        }
+      };
+      walk(0, buf.length, { mode: 'none' }, 0);
+
+      let slides = slwtSlides;
+      if (slides.length === 0) slides = slideBoxes;
+      else if (slideBoxes.length === slides.length) {
+        // 텍스트 상자(자리 표시자가 아닌 글)도 덧붙임
+        slides = slides.map((s, i) => {
+          const extra = slideBoxes[i].filter(t => !s.includes(t));
+          return s.concat(extra);
+        });
+      }
+      slides = slides.filter(s => s.length);
+      if (slides.length === 0) throw new Error('글자 없음');
+
+      container.innerHTML = slides.map((texts, i) => {
+        const [title, ...rest] = texts;
+        return `
+          <div class="pptx-slide-wrap" style="width:100%;">
+            <div class="pptx-slide-no">${i + 1} / ${slides.length}</div>
+            <div class="ppt-text-card">
+              <div class="ppt-text-title">${escapeHtml(title).replace(/\n/g, '<br>')}</div>
+              ${rest.map(t => `<div class="ppt-text-body">${escapeHtml(t).replace(/\n/g, '<br>')}</div>`).join('')}
+            </div>
+          </div>`;
+      }).join('');
+      return slides.length;
     }
 
     // UTILITIES
